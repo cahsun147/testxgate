@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-static';
+export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const config = {
   output: 'export',
@@ -260,7 +261,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(combinedData);
   } catch (error) {
-    console.error('API Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch combined data' }, { status: 500 });
+    console.error('Error fetching data:', error);
+    return NextResponse.json({ error: 'Failed to fetch data' });
   }
 }

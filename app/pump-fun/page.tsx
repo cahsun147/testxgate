@@ -80,14 +80,26 @@ export default function PumpFun() {
   const [pools, setPools] = useState<CombinedPoolData[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState("24h");
   const [isLoading, setIsLoading] = useState(true);
+  const [isBackgroundUpdate, setIsBackgroundUpdate] = useState(false);
 
   useEffect(() => {
-    const fetchPools = async () => {
+    let isSubscribed = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const fetchPools = async (isInitialLoad: boolean = false) => {
       try {
-        setIsLoading(true);
+        // Only show loading on initial load or period change
+        if (!isBackgroundUpdate) {
+          setIsLoading(true);
+        }
+
         const response = await fetch(`/api/pump-fun-combined?period=${selectedPeriod}`);
+        if (!isSubscribed) return;
+        
         if (response.ok) {
           const data = await response.json();
+          if (!isSubscribed) return;
+
           // Sort data based on selected period's change percentage
           const sortedData = data.sort((a: CombinedPoolData, b: CombinedPoolData) => {
             const aChange = parseFloat(a.changes[selectedPeriod as keyof typeof a.changes]);
@@ -99,11 +111,27 @@ export default function PumpFun() {
       } catch (error) {
         console.error('Error fetching pools:', error);
       } finally {
-        setIsLoading(false);
+        if (isSubscribed) {
+          setIsLoading(false);
+          // Set background update flag for next update
+          setIsBackgroundUpdate(true);
+          // Schedule next update
+          timeoutId = setTimeout(() => fetchPools(false), 10000);
+        }
       }
     };
 
-    fetchPools();
+    // Reset background update flag on period change
+    setIsBackgroundUpdate(false);
+    fetchPools(true);
+
+    // Cleanup function
+    return () => {
+      isSubscribed = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [selectedPeriod]);
 
   // Helper functions

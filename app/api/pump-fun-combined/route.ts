@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
 export const revalidate = 0;
+export const config = {
+  output: 'export',
+};
 
 interface SocialLinks {
   websites: string[];

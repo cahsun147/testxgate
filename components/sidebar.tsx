@@ -25,7 +25,7 @@ export function Sidebar() {
   return (
     <div className="h-screen w-64 bg-card border-r">
       <div className="p-6">
-        <h2 className="text-2xl font-bold mb-6">StalkFun</h2>
+        <h2 className="text-2xl font-bold mb-6">XGate</h2>
         <nav className="space-y-2">
           {menuItems.map((item) => (
             <Link key={item.title} href={item.href}>

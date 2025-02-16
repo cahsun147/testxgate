@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/sidebar";
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'StalkFun - Crypto Dashboard',
+  title: 'XGATE - Crypto Dashboard',
   description: 'Track the latest crypto trends and pump tokens',
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -80,7 +80,7 @@ export default function PumpFun() {
   const [pools, setPools] = useState<CombinedPoolData[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState("24h");
   const [isLoading, setIsLoading] = useState(true);
-  const [isBackgroundUpdate, setIsBackgroundUpdate] = useState(false);
+  const previousDataRef = useRef<CombinedPoolData[]>([]);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -88,8 +88,8 @@ export default function PumpFun() {
 
     const fetchPools = async (isInitialLoad: boolean = false) => {
       try {
-        // Only show loading on initial load or period change
-        if (!isBackgroundUpdate) {
+        // Only show loading on initial load when there's no data
+        if (isInitialLoad && pools.length === 0) {
           setIsLoading(true);
         }
 
@@ -100,29 +100,43 @@ export default function PumpFun() {
           const data = await response.json();
           if (!isSubscribed) return;
 
+          // Store current data as previous before updating
+          previousDataRef.current = pools;
+
           // Sort data based on selected period's change percentage
           const sortedData = data.sort((a: CombinedPoolData, b: CombinedPoolData) => {
             const aChange = parseFloat(a.changes[selectedPeriod as keyof typeof a.changes]);
             const bChange = parseFloat(b.changes[selectedPeriod as keyof typeof b.changes]);
             return bChange - aChange;
           });
-          setPools(sortedData);
+
+          // Only update if we have valid new data
+          if (sortedData && Array.isArray(sortedData) && sortedData.length > 0) {
+            setPools(sortedData);
+          } else if (previousDataRef.current.length > 0) {
+            // If new data is invalid but we have previous data, keep showing it
+            setPools(previousDataRef.current);
+          }
+        } else if (previousDataRef.current.length > 0) {
+          // If request fails but we have previous data, keep showing it
+          setPools(previousDataRef.current);
         }
       } catch (error) {
         console.error('Error fetching pools:', error);
+        // On error, keep showing previous data if available
+        if (previousDataRef.current.length > 0) {
+          setPools(previousDataRef.current);
+        }
       } finally {
         if (isSubscribed) {
           setIsLoading(false);
-          // Set background update flag for next update
-          setIsBackgroundUpdate(true);
           // Schedule next update
-          timeoutId = setTimeout(() => fetchPools(false), 10000);
+          timeoutId = setTimeout(() => fetchPools(false), 15000);
         }
       }
     };
 
-    // Reset background update flag on period change
-    setIsBackgroundUpdate(false);
+    // Start fetching
     fetchPools(true);
 
     // Cleanup function
@@ -133,6 +147,9 @@ export default function PumpFun() {
       }
     };
   }, [selectedPeriod]);
+
+  // Only show loading when there's no data at all
+  const showLoading = isLoading && pools.length === 0 && previousDataRef.current.length === 0;
 
   // Helper functions
   const formatPercent = (value: string) => {
@@ -332,44 +349,50 @@ export default function PumpFun() {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
+              {showLoading ? (
                 <tr>
                   <td colSpan={13} className="text-center py-8">Loading...</td>
                 </tr>
-              ) : pools.map((pool, index) => (
-                <tr key={pool.id} className="border-b border-gray-800 hover:bg-gray-800/30">
-                  <td className="px-4 py-4">{index + 1}</td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 relative">
-                        <Image
-                          src={pool.imageUrl}
-                          alt={pool.symbol}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div>
-                        <div className="font-medium">{pool.symbol}/SOL</div>
-                        <div className="text-sm text-gray-400">{pool.name}</div>
-                        <SocialLinks pool={pool} />
-                        <SecurityScore security={pool.security} />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-right">${parseFloat(pool.price).toFixed(7)}</td>
-                  <td className="px-4 py-4 text-right">{formatAge(pool.age)}</td>
-                  <td className="px-4 py-4 text-right">{pool.swapCount24h || '-'}</td>
-                  <td className="px-4 py-4 text-right">{formatPercent(pool.changes['5m'])}</td>
-                  <td className="px-4 py-4 text-right">{formatPercent(pool.changes['1h'])}</td>
-                  <td className="px-4 py-4 text-right">{formatPercent(pool.changes['6h'])}</td>
-                  <td className="px-4 py-4 text-right">{formatPercent(pool.changes['24h'])}</td>
-                  <td className="px-4 py-4 text-right">{formatCurrency(pool.volume)}</td>
-                  <td className="px-4 py-4 text-right">{formatCurrency(pool.liquidity)}</td>
-                  <td className="px-4 py-4 text-right">{formatCurrency(pool.marketCapToHolder)}</td>
-                  <td className="px-4 py-4 text-right">{formatCurrency(pool.fdv)}</td>
+              ) : pools.length === 0 ? (
+                <tr>
+                  <td colSpan={13} className="text-center py-8">No data available</td>
                 </tr>
-              ))}
+              ) : (
+                pools.map((pool, index) => (
+                  <tr key={pool.id} className="border-b border-gray-800 hover:bg-gray-800/30">
+                    <td className="px-4 py-4">{index + 1}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 relative">
+                          <Image
+                            src={pool.imageUrl}
+                            alt={pool.symbol}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <div className="font-medium">{pool.symbol}/SOL</div>
+                          <div className="text-sm text-gray-400">{pool.name}</div>
+                          <SocialLinks pool={pool} />
+                          <SecurityScore security={pool.security} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-right">${parseFloat(pool.price).toFixed(7)}</td>
+                    <td className="px-4 py-4 text-right">{formatAge(pool.age)}</td>
+                    <td className="px-4 py-4 text-right">{pool.swapCount24h || '-'}</td>
+                    <td className="px-4 py-4 text-right">{formatPercent(pool.changes['5m'])}</td>
+                    <td className="px-4 py-4 text-right">{formatPercent(pool.changes['1h'])}</td>
+                    <td className="px-4 py-4 text-right">{formatPercent(pool.changes['6h'])}</td>
+                    <td className="px-4 py-4 text-right">{formatPercent(pool.changes['24h'])}</td>
+                    <td className="px-4 py-4 text-right">{formatCurrency(pool.volume)}</td>
+                    <td className="px-4 py-4 text-right">{formatCurrency(pool.liquidity)}</td>
+                    <td className="px-4 py-4 text-right">{formatCurrency(pool.marketCapToHolder)}</td>
+                    <td className="px-4 py-4 text-right">{formatCurrency(pool.fdv)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

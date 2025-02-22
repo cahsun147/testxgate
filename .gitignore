@@ -33,3 +33,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# response files
+1hresponse.json
+5mresponse.json
+6hresponse.json
+24hresponse.json
+fullinfromasi.json
+
+# test-api
+app/api/test-api/

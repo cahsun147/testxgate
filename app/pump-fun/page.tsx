@@ -4,9 +4,23 @@ import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FilterDialog } from "@/components/filter-dialog";
+import { FaEye } from "react-icons/fa6";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   FaGlobe,
-  FaXTwitter,
+  FaTwitter,
   FaTelegram,
   FaMedium,
   FaTiktok,
@@ -18,13 +32,35 @@ import {
   FaChevronDown,
   FaDiscord,
 } from "react-icons/fa6";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { FilterDialog } from "@/components/filter-dialog";
+
+interface SecurityDetails {
+  gtScore: number;
+  gtScoreDetails: {
+    info: number;
+    pool: number;
+    transactions: number;
+    holders: number;
+    creation: number;
+  };
+  lockedLiquidity: {
+    locked_percent: number;
+    next_unlock_timestamp: string | null;
+    final_unlock_timestamp: string | null;
+    source: string;
+    url: string;
+  } | null;
+  sentimentVotes: {
+    total: number;
+    up_percentage: number;
+    down_percentage: number;
+  };
+  securityLinks: {
+    name: string;
+    category: string;
+    url: string;
+    image_url: string;
+  }[];
+}
 
 interface CombinedPoolData {
   id: string;
@@ -48,7 +84,7 @@ interface CombinedPoolData {
     '6h': string;
     '24h': string;
   };
-  description: string;
+  security: SecurityDetails;
   socialLinks: {
     websites: string[];
     discord_url: string | null;
@@ -57,21 +93,11 @@ interface CombinedPoolData {
     medium_handle: string | null;
     github_repo_name: string | null;
     subreddit_handle: string | null;
-  };
-  security: {
-    gtScore: number;
-    gtScoreDetails: {
-      info: number;
-      pool: number;
-      transactions: number;
-      holders: number;
-      creation: number;
-    };
-    lockedLiquidity: {
-      locked_percent: number;
-      next_unlock_timestamp: string | null;
-      final_unlock_timestamp: string | null;
-    };
+    tiktok_handle: string | null;
+    youtube_handle: string | null;
+    facebook_handle: string | null;
+    instagram_handle: string | null;
+    description: string;
   };
   swapCount24h: number;
 }
@@ -202,8 +228,8 @@ export default function PumpFun() {
         </a>
       )}
       {pool.socialLinks.twitter_handle && (
-        <a href={`https://twitter.com/${pool.socialLinks.twitter_handle}`} target="_blank" rel="noopener noreferrer">
-          <FaXTwitter className="text-gray-400 hover:text-white" size={14} />
+        <a href={`https://x.com/${pool.socialLinks.twitter_handle}`} target="_blank" rel="noopener noreferrer">
+          <FaTwitter className="text-gray-400 hover:text-white" size={14} />
         </a>
       )}      
       {pool.socialLinks.discord_url && (
@@ -219,44 +245,111 @@ export default function PumpFun() {
     </div>
   );
 
-  const SecurityScore = ({ security }: { security: CombinedPoolData['security'] }) => (
-    <div className="flex items-center gap-2 mt-1">
-      <div className="text-sm font-medium">
-        Score: {security.gtScore.toFixed(1)}
-      </div>
-      <Popover>
-        <PopoverTrigger>
-          <div className="flex items-center text-gray-400 hover:text-white cursor-pointer">
-            Details <FaChevronDown size={12} className="ml-1" />
+  const SecurityScore = ({ security }: { security: CombinedPoolData['security'] }) => {
+    const [open, setOpen] = useState(false);
+
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <FaEye className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Security Analysis</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium">GT Score</h3>
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "text-lg font-semibold",
+                  security.gtScore >= 7 ? "text-green-500" :
+                  security.gtScore >= 4 ? "text-yellow-500" : "text-red-500"
+                )}>
+                  {security.gtScore.toFixed(1)}
+                </div>
+                <div className="text-sm text-gray-500">/ 10</div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Score Details</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Info: {security.gtScoreDetails.info}</div>
+                <div>Pool: {security.gtScoreDetails.pool}</div>
+                <div>Transactions: {security.gtScoreDetails.transactions}</div>
+                <div>Holders: {security.gtScoreDetails.holders}</div>
+                <div>Creation: {security.gtScoreDetails.creation}</div>
+              </div>
+            </div>
+
+            {security.lockedLiquidity && (
+              <div>
+                <h3 className="font-medium mb-2">Liquidity Lock</h3>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span>Locked:</span>
+                    <span className={cn(
+                      "font-medium",
+                      security.lockedLiquidity.locked_percent >= 80 ? "text-green-500" :
+                      security.lockedLiquidity.locked_percent >= 50 ? "text-yellow-500" : "text-red-500"
+                    )}>
+                      {security.lockedLiquidity.locked_percent}%
+                    </span>
+                  </div>
+                  {security.lockedLiquidity.next_unlock_timestamp && (
+                    <div className="text-sm text-gray-600">
+                      Next unlock: {new Date(security.lockedLiquidity.next_unlock_timestamp).toLocaleDateString()}
+                    </div>
+                  )}
+                  {security.lockedLiquidity.url && (
+                    <a href={security.lockedLiquidity.url} target="_blank" rel="noopener noreferrer" 
+                      className="text-sm text-blue-500 hover:underline">
+                      View on {security.lockedLiquidity.source}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {security.sentimentVotes.total > 0 && (
+              <div>
+                <h3 className="font-medium mb-2">Community Sentiment</h3>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-500">{security.sentimentVotes.up_percentage}% 👍</span>
+                    <span className="text-red-500">{security.sentimentVotes.down_percentage}% 👎</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Based on {security.sentimentVotes.total} votes
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {security.securityLinks.length > 0 && (
+              <div>
+                <h3 className="font-medium mb-2">Security Reports</h3>
+                <div className="space-y-2">
+                  {security.securityLinks.map((link, index) => (
+                    <a key={index} href={link.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-blue-500 hover:underline">
+                      {link.image_url && (
+                        <img src={link.image_url} alt={link.name} className="h-4 w-4" />
+                      )}
+                      {link.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </PopoverTrigger>
-        <PopoverContent className="bg-gray-800 border-gray-700 text-white p-4">
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>Info:</span>
-              <span>{security.gtScoreDetails.info}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Pool:</span>
-              <span>{security.gtScoreDetails.pool}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Transactions:</span>
-              <span>{security.gtScoreDetails.transactions}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Holders:</span>
-              <span>{security.gtScoreDetails.holders}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Creation:</span>
-              <span>{security.gtScoreDetails.creation}</span>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   const handleApplyFilters = async (filters: any) => {
     try {
@@ -319,8 +412,6 @@ export default function PumpFun() {
           <Tabs defaultValue={selectedPeriod} onValueChange={setSelectedPeriod}>
             <TabsList className="bg-gray-800/50 backdrop-blur-lg border border-purple-400/20">
               <TabsTrigger value="5m" className="data-[state=active]:bg-purple-400/20">5M</TabsTrigger>
-              <TabsTrigger value="15m" className="data-[state=active]:bg-purple-400/20">15M</TabsTrigger>
-              <TabsTrigger value="30m" className="data-[state=active]:bg-purple-400/20">30M</TabsTrigger>
               <TabsTrigger value="1h" className="data-[state=active]:bg-purple-400/20">1H</TabsTrigger>
               <TabsTrigger value="6h" className="data-[state=active]:bg-purple-400/20">6H</TabsTrigger>
               <TabsTrigger value="24h" className="data-[state=active]:bg-purple-400/20">24H</TabsTrigger>
@@ -334,9 +425,10 @@ export default function PumpFun() {
             <thead>
               <tr className="text-sm text-gray-400 border-b border-gray-800">
                 <th className="px-4 py-2 text-left">#</th>
-                <th className="px-4 py-2 text-left">POOL</th>
-                <th className="px-4 py-2 text-right">PRICE</th>
-                <th className="px-4 py-2 text-right">AGE</th>
+                <th className="px-4 py-2 text-left">Pool</th>
+                <th className="px-4 py-2 text-center w-8"></th>
+                <th className="px-4 py-2 text-right">Price</th>
+                <th className="px-4 py-2 text-right">Age</th>
                 <th className="px-4 py-2 text-right">TXN</th>
                 <th className="px-4 py-2 text-right">5M</th>
                 <th className="px-4 py-2 text-right">1H</th>
@@ -361,23 +453,26 @@ export default function PumpFun() {
                 pools.map((pool, index) => (
                   <tr key={pool.id} className="border-b border-gray-800 hover:bg-gray-800/30">
                     <td className="px-4 py-4">{index + 1}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 relative">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-8 h-8 flex-shrink-0">
                           <Image
-                            src={pool.imageUrl}
-                            alt={pool.symbol}
+                            src={pool.imageUrl || '/placeholder.png'}
+                            alt={pool.name}
                             fill
-                            className="object-cover"
+                            className="rounded-full object-cover"
+                            sizes="32px"
+                            priority
                           />
                         </div>
-                        <div>
-                          <div className="font-medium">{pool.symbol}/SOL</div>
+                        <div className="flex flex-col">
+                          <div className="font-medium">{pool.symbol}</div>
                           <div className="text-sm text-gray-400">{pool.name}</div>
-                          <SocialLinks pool={pool} />
-                          <SecurityScore security={pool.security} />
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <SecurityScore security={pool.security} />
                     </td>
                     <td className="px-4 py-4 text-right">${parseFloat(pool.price).toFixed(7)}</td>
                     <td className="px-4 py-4 text-right">{formatAge(pool.age)}</td>

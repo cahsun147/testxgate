@@ -1,10 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: { unoptimized: true },
+  images: { 
+    unoptimized: true 
+  },
+  experimental: {
+    // Menggunakan fitur yang stabil di Next.js 14
+    serverActions: {
+      bodySizeLimit: '2mb'
+    }
+  }
 };
 
 module.exports = nextConfig;
